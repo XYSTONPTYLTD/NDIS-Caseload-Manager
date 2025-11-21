@@ -58,6 +58,7 @@ st.markdown("""
     }
     .link-row a:hover { background: #238636; color: white; border-color: #2ea043; padding-left: 15px; }
     
+    /* GUIDE BOXES */
     .guide-box { background-color: #161b22; border-left: 4px solid #238636; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
     .guide-title { font-weight: bold; color: #fff; margin-bottom: 5px; font-size: 1.1em; }
     .guide-text { color: #8b949e; font-size: 0.9em; line-height: 1.5; }
@@ -78,46 +79,43 @@ with st.sidebar:
         with st.expander("🔐 AI Settings"):
             api_key = st.text_input("Google API Key", type="password")
 
-    # --- SMART DATA MANAGER (FIXED) ---
-    with st.expander("📂 Data Manager", expanded=True):
-        # 1. Universal Loader
-        uploaded_file = st.file_uploader("Upload File (JSON or CSV)", type=['json', 'csv'], help="Drag your Backup file OR your CSV template here.")
+    # DATA TOOLS
+    with st.expander("📂 Import / Export", expanded=True):
+        tab_json, tab_csv = st.tabs(["Backup", "Bulk CSV"])
         
-        if uploaded_file:
-            # SMART DETECTION LOGIC
-            if uploaded_file.name.endswith('.json'):
-                try:
-                    st.session_state.caseload = json.load(uploaded_file)
-                    st.success(f"Restored {len(st.session_state.caseload)} clients!")
-                    # No rerun loop here
-                except: st.error("Invalid JSON Backup.")
-            
-            elif uploaded_file.name.endswith('.csv'):
-                # CSV Logic
-                new_data = process_csv_upload(uploaded_file)
-                if new_data:
-                    # Prevent duplicates or merge? For now, we append.
-                    st.session_state.caseload.extend(new_data)
-                    st.success(f"Imported {len(new_data)} clients!")
-                else:
-                    st.error("CSV Format Error. Use template below.")
-
-        st.markdown("---")
-        
-        # 2. Export Tools
-        c1, c2 = st.columns(2)
-        with c1:
-            # Save JSON
+        # Tab 1: JSON
+        with tab_json:
             if st.session_state.caseload:
-                st.download_button("💾 Backup", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
-            else:
-                st.button("💾 Backup", disabled=True, use_container_width=True)
-        with c2:
-            # Get Template
-            csv_template = generate_csv_template()
-            st.download_button("📄 Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+                st.download_button("💾 Save Backup", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
+            
+            uploaded_json = st.file_uploader("Load Backup", type=['json'], label_visibility="collapsed", key="json_loader")
+            if uploaded_json:
+                try:
+                    st.session_state.caseload = json.load(uploaded_json)
+                    st.success(f"Loaded {len(st.session_state.caseload)} clients!")
+                    # No rerun loop
+                except: st.error("Invalid JSON")
 
-    # --- ADD CLIENT ---
+        # Tab 2: CSV (FIXED)
+        with tab_csv:
+            csv_template = generate_csv_template()
+            st.download_button("📄 Get CSV Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+            
+            # FIXED: CSV UPLOADER LOGIC
+            with st.form("csv_import_form", clear_on_submit=True):
+                uploaded_csv = st.file_uploader("Upload CSV", type=['csv'], label_visibility="collapsed")
+                submitted = st.form_submit_button("Import Data")
+                
+                if submitted and uploaded_csv:
+                    new_data = process_csv_upload(uploaded_csv)
+                    if new_data:
+                        st.session_state.caseload.extend(new_data)
+                        st.success(f"Imported {len(new_data)} participants!")
+                        st.rerun()
+                    else:
+                        st.error("Could not read CSV. Use the template.")
+
+    # ADD CLIENT
     with st.expander("➕ Add Single Client", expanded=False):
         with st.form("add_form"):
             name = st.text_input("Name")
@@ -132,7 +130,7 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # --- COMMAND CENTRE ---
+    # COMMAND CENTRE (SIDEBAR ONLY)
     st.markdown("---")
     st.caption("COMMAND CENTRE")
     
@@ -183,47 +181,19 @@ if not st.session_state.caseload:
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. Support & Action
-    c_empty1, c_donate, c_empty2 = st.columns([1, 1, 1]) 
-    with c_donate:
-        st.markdown("""
-        <div style="display: flex; justify-content: center; margin: 20px 0;">
-            <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
-                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
-    
+    # 2. Donation Center
     st.markdown("""
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
+        <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
+        </a>
+    </div>
     <p style="text-align: center; color: #8b949e; font-size: 12px; margin-bottom: 40px;">
         Your support keeps this tool free, secure, and up-to-date.
     </p>
     """, unsafe_allow_html=True)
 
-    # 3. Command Centre (Launchpad)
-    st.markdown("### ⚡ Command Centre")
-    col_g1, col_g2, col_g3 = st.columns(3)
-    
-    with col_g1:
-        st.markdown("**🏛️ NDIS Compliance**")
-        st.markdown('<a href="https://proda.humanservices.gov.au/" class="link-btn" target="_blank">🔐 PACE / PRODA Login</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.ndis.gov.au/providers/pricing-arrangements" class="link-btn" target="_blank">💰 Pricing Arrangements</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://ourguidelines.ndis.gov.au/" class="link-btn" target="_blank">📜 Operational Guidelines</a>', unsafe_allow_html=True)
-
-    with col_g2:
-        st.markdown("**🛠️ Administration**")
-        st.markdown('<a href="https://secure.employmenthero.com/login" class="link-btn" target="_blank">👤 Employment Hero HR</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://login.xero.com/" class="link-btn" target="_blank">📊 Xero Accounting</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.ndiscommission.gov.au/" class="link-btn" target="_blank">⚖️ NDIS Commission</a>', unsafe_allow_html=True)
-
-    with col_g3:
-        st.markdown("**🏦 Institution Banking**")
-        st.markdown('<a href="https://www.commbank.com.au/" class="link-btn" target="_blank">CommBank</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.westpac.com.au/" class="link-btn" target="_blank">Westpac</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.anz.com.au/" class="link-btn" target="_blank">ANZ</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.nab.com.au/" class="link-btn" target="_blank">NAB</a>', unsafe_allow_html=True)
-
-    # 4. Instructions & Disclaimer
+    # 3. Instructions (Cleaned up)
     st.markdown("---")
     c_how, c_safe = st.columns(2)
     
@@ -258,7 +228,7 @@ if not st.session_state.caseload:
     </div>
     """, unsafe_allow_html=True)
     
-    st.stop()
+    st.stop() # Stop here so the dashboard doesn't try to render empty data
 
 # ==============================================================================
 # ACTIVE DASHBOARD (DATA LOADED)
