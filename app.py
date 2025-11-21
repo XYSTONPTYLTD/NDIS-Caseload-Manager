@@ -58,20 +58,11 @@ st.markdown("""
     }
     .link-row a:hover { background: #238636; color: white; border-color: #2ea043; padding-left: 15px; }
     
-    /* GUIDE BOXES */
-    .guide-box {
-        background-color: #161b22;
-        border-left: 4px solid #238636;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 4px;
-    }
+    .guide-box { background-color: #161b22; border-left: 4px solid #238636; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
     .guide-title { font-weight: bold; color: #fff; margin-bottom: 5px; font-size: 1.1em; }
     .guide-text { color: #8b949e; font-size: 0.9em; line-height: 1.5; }
     
     .disclaimer-text { font-size: 0.75em; color: #484f58; text-align: center; margin-top: 30px; }
-    
-    /* BUTTONS */
     .stButton button { width: 100%; border-radius: 6px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
@@ -80,45 +71,53 @@ st.markdown("""
 # 2. SIDEBAR
 # ==============================================================================
 with st.sidebar:
-    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v4.5</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v5.0</p></div>", unsafe_allow_html=True)
     
     api_key = st.secrets.get("GEMINI_API_KEY", None)
     if not api_key:
         with st.expander("🔐 AI Settings"):
             api_key = st.text_input("Google API Key", type="password")
 
-    # DATA TOOLS
-    with st.expander("📂 Import / Export", expanded=True):
-        tab_json, tab_csv = st.tabs(["Backup", "Bulk Import"])
-        with tab_json:
-            if st.session_state.caseload:
-                st.download_button("💾 Save Database", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
-            uploaded_json = st.file_uploader("Load Backup", type=['json'], label_visibility="collapsed", key="json_up")
-            if uploaded_json:
+    # --- SMART DATA MANAGER (FIXED) ---
+    with st.expander("📂 Data Manager", expanded=True):
+        # 1. Universal Loader
+        uploaded_file = st.file_uploader("Upload File (JSON or CSV)", type=['json', 'csv'], help="Drag your Backup file OR your CSV template here.")
+        
+        if uploaded_file:
+            # SMART DETECTION LOGIC
+            if uploaded_file.name.endswith('.json'):
                 try:
-                    st.session_state.caseload = json.load(uploaded_json)
-                    st.success(f"Loaded {len(st.session_state.caseload)} clients!")
-                    st.rerun()
-                except: st.error("Error loading JSON")
-
-        with tab_csv:
-            csv_template = generate_csv_template()
-            st.download_button("📄 Get CSV Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+                    st.session_state.caseload = json.load(uploaded_file)
+                    st.success(f"Restored {len(st.session_state.caseload)} clients!")
+                    # No rerun loop here
+                except: st.error("Invalid JSON Backup.")
             
-            # Fix: Form to prevent infinite loop
-            with st.form("csv_upload_form", clear_on_submit=True):
-                uploaded_csv = st.file_uploader("Import CSV", type=['csv'], label_visibility="collapsed")
-                submitted = st.form_submit_button("Import")
-                if submitted and uploaded_csv:
-                    new_data = process_csv_upload(uploaded_csv)
-                    if new_data:
-                        st.session_state.caseload.extend(new_data)
-                        st.success(f"Imported {len(new_data)} clients!")
-                        st.rerun()
-                    else:
-                        st.error("Format Error. Use the template.")
+            elif uploaded_file.name.endswith('.csv'):
+                # CSV Logic
+                new_data = process_csv_upload(uploaded_file)
+                if new_data:
+                    # Prevent duplicates or merge? For now, we append.
+                    st.session_state.caseload.extend(new_data)
+                    st.success(f"Imported {len(new_data)} clients!")
+                else:
+                    st.error("CSV Format Error. Use template below.")
 
-    # ADD CLIENT
+        st.markdown("---")
+        
+        # 2. Export Tools
+        c1, c2 = st.columns(2)
+        with c1:
+            # Save JSON
+            if st.session_state.caseload:
+                st.download_button("💾 Backup", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
+            else:
+                st.button("💾 Backup", disabled=True, use_container_width=True)
+        with c2:
+            # Get Template
+            csv_template = generate_csv_template()
+            st.download_button("📄 Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+
+    # --- ADD CLIENT ---
     with st.expander("➕ Add Single Client", expanded=False):
         with st.form("add_form"):
             name = st.text_input("Name")
@@ -133,9 +132,37 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # CREDITS
+    # --- COMMAND CENTRE ---
     st.markdown("---")
-    st.markdown('<div style="text-align:center; font-size:12px; color:#666;">Built by Chas Walker<br>© 2025 Xyston Pty Ltd</div>', unsafe_allow_html=True)
+    st.caption("COMMAND CENTRE")
+    
+    with st.expander("⚡ Admin & Banking"):
+        st.markdown("""
+        <div class="link-row">
+            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
+            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
+            <hr style="border-color:#333; margin:5px 0;">
+            <a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a>
+            <a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a>
+            <a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a>
+            <a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with st.expander("🏛️ NDIS Compliance"):
+        st.markdown("""
+        <div class="link-row">
+            <a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a>
+            <a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a>
+            <a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a>
+            <a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a>
+            <a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a>
+            <a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("---")
+    st.markdown('<div style="text-align:center"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:160px;"></a></div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # 3. MAIN DASHBOARD (ZERO STATE vs ACTIVE STATE)
