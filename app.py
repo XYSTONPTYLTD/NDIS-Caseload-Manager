@@ -34,6 +34,15 @@ st.markdown("""
     .metric-val { font-size: 24px; font-weight: 800; color: #ffffff; }
     .metric-lbl { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
     
+    /* CHART CONTAINERS */
+    .chart-container {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
     /* LINKS & BUTTONS */
     .link-btn {
         display: block;
@@ -72,53 +81,43 @@ st.markdown("""
 # 2. SIDEBAR
 # ==============================================================================
 with st.sidebar:
-    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v5.0</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v6.0</p></div>", unsafe_allow_html=True)
     
     api_key = st.secrets.get("GEMINI_API_KEY", None)
     if not api_key:
         with st.expander("🔐 AI Settings"):
             api_key = st.text_input("Google API Key", type="password")
 
-    # --- SMART DATA MANAGER (FIXED) ---
-    with st.expander("📂 Data Manager", expanded=True):
-        # 1. Universal Loader
-        uploaded_file = st.file_uploader("Upload File (JSON or CSV)", type=['json', 'csv'], help="Drag your Backup file OR your CSV template here.")
-        
-        if uploaded_file:
-            # SMART DETECTION LOGIC
-            if uploaded_file.name.endswith('.json'):
-                try:
-                    st.session_state.caseload = json.load(uploaded_file)
-                    st.success(f"Restored {len(st.session_state.caseload)} clients!")
-                    # No rerun loop here
-                except: st.error("Invalid JSON Backup.")
-            
-            elif uploaded_file.name.endswith('.csv'):
-                # CSV Logic
-                new_data = process_csv_upload(uploaded_file)
-                if new_data:
-                    # Prevent duplicates or merge? For now, we append.
-                    st.session_state.caseload.extend(new_data)
-                    st.success(f"Imported {len(new_data)} clients!")
-                else:
-                    st.error("CSV Format Error. Use template below.")
-
-        st.markdown("---")
-        
-        # 2. Export Tools
-        c1, c2 = st.columns(2)
-        with c1:
-            # Save JSON
+    # DATA TOOLS
+    with st.expander("📂 Import / Export", expanded=True):
+        tab_json, tab_csv = st.tabs(["Backup", "Bulk Import"])
+        with tab_json:
             if st.session_state.caseload:
-                st.download_button("💾 Backup", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
-            else:
-                st.button("💾 Backup", disabled=True, use_container_width=True)
-        with c2:
-            # Get Template
-            csv_template = generate_csv_template()
-            st.download_button("📄 Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+                st.download_button("💾 Save Database", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
+            uploaded_json = st.file_uploader("Load Backup", type=['json'], label_visibility="collapsed", key="json_up")
+            if uploaded_json:
+                try:
+                    st.session_state.caseload = json.load(uploaded_json)
+                    st.success(f"Loaded {len(st.session_state.caseload)} clients!")
+                    st.rerun()
+                except: st.error("Error loading JSON")
 
-    # --- ADD CLIENT ---
+        with tab_csv:
+            csv_template = generate_csv_template()
+            st.download_button("📄 Get CSV Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
+            
+            with st.form("csv_upload_form", clear_on_submit=True):
+                uploaded_csv = st.file_uploader("Import CSV", type=['csv'], label_visibility="collapsed")
+                submitted = st.form_submit_button("Import Data")
+                if submitted and uploaded_csv:
+                    new_data = process_csv_upload(uploaded_csv)
+                    if new_data:
+                        st.session_state.caseload.extend(new_data)
+                        st.success(f"Imported {len(new_data)} clients!")
+                        st.rerun()
+                    else: st.error("Format Error.")
+
+    # ADD CLIENT
     with st.expander("➕ Add Single Client", expanded=False):
         with st.form("add_form"):
             name = st.text_input("Name")
@@ -133,137 +132,38 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # --- COMMAND CENTRE ---
+    # COMMAND CENTRE
     st.markdown("---")
     st.caption("COMMAND CENTRE")
-    
     with st.expander("⚡ Admin & Banking"):
-        st.markdown("""
-        <div class="link-row">
-            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
-            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
-            <hr style="border-color:#333; margin:5px 0;">
-            <a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a>
-            <a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a>
-            <a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a>
-            <a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a>
-        </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div class="link-row"><a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a><a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a><hr style="border-color:#333; margin:5px 0;"><a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth</a><a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a><a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a><a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a></div>', unsafe_allow_html=True)
     with st.expander("🏛️ NDIS Compliance"):
-        st.markdown("""
-        <div class="link-row">
-            <a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a>
-            <a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a>
-            <a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a>
-            <a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a>
-            <a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a>
-            <a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown('<div class="link-row"><a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a><a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a><a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a><a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a></div>', unsafe_allow_html=True)
+    
     st.markdown("---")
     st.markdown('<div style="text-align:center"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:160px;"></a></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. MAIN DASHBOARD (ZERO STATE vs ACTIVE STATE)
+# 3. DASHBOARD LOGIC
 # ==============================================================================
 
-# HERO SCREEN (ZERO STATE)
+# HERO SCREEN
 if not st.session_state.caseload:
-    
-    # 1. Header
     st.markdown("""
-    <div style="text-align: center; padding: 40px 20px 20px 20px;">
+    <div style="text-align: center; padding: 40px;">
         <h1 style="font-size: 50px; margin-bottom: 10px;">🛡️</h1>
-        <h1 style="margin-bottom: 10px;">Xyston Caseload Master</h1>
-        <p style="color: #8b949e; font-size: 18px; max-width: 700px; margin: 0 auto;">
-            The operating system for independent Support Coordinators. <br>
-            Visualise funding, mitigate risk, and generate reports in seconds.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 2. Support & Action
-    c_empty1, c_donate, c_empty2 = st.columns([1, 1, 1]) 
-    with c_donate:
-        st.markdown("""
-        <div style="display: flex; justify-content: center; margin: 20px 0;">
-            <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
-                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <p style="text-align: center; color: #8b949e; font-size: 12px; margin-bottom: 40px;">
-        Your support keeps this tool free, secure, and up-to-date.
-    </p>
-    """, unsafe_allow_html=True)
-
-    # 3. Command Centre (Launchpad)
-    st.markdown("### ⚡ Command Centre")
-    col_g1, col_g2, col_g3 = st.columns(3)
-    
-    with col_g1:
-        st.markdown("**🏛️ NDIS Compliance**")
-        st.markdown('<a href="https://proda.humanservices.gov.au/" class="link-btn" target="_blank">🔐 PACE / PRODA Login</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.ndis.gov.au/providers/pricing-arrangements" class="link-btn" target="_blank">💰 Pricing Arrangements</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://ourguidelines.ndis.gov.au/" class="link-btn" target="_blank">📜 Operational Guidelines</a>', unsafe_allow_html=True)
-
-    with col_g2:
-        st.markdown("**🛠️ Administration**")
-        st.markdown('<a href="https://secure.employmenthero.com/login" class="link-btn" target="_blank">👤 Employment Hero HR</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://login.xero.com/" class="link-btn" target="_blank">📊 Xero Accounting</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.ndiscommission.gov.au/" class="link-btn" target="_blank">⚖️ NDIS Commission</a>', unsafe_allow_html=True)
-
-    with col_g3:
-        st.markdown("**🏦 Institution Banking**")
-        st.markdown('<a href="https://www.commbank.com.au/" class="link-btn" target="_blank">CommBank</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.westpac.com.au/" class="link-btn" target="_blank">Westpac</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.anz.com.au/" class="link-btn" target="_blank">ANZ</a>', unsafe_allow_html=True)
-        st.markdown('<a href="https://www.nab.com.au/" class="link-btn" target="_blank">NAB</a>', unsafe_allow_html=True)
-
-    # 4. Instructions & Disclaimer
-    st.markdown("---")
-    c_how, c_safe = st.columns(2)
-    
-    with c_how:
-        st.markdown("""
-        <div class="guide-box">
-            <div class="guide-title">🚀 How to Start</div>
-            <div class="guide-text">
-                1. <b>Load Data:</b> Use the Sidebar to upload a JSON backup or import a CSV.<br>
-                2. <b>Add Manual:</b> Use "Add Single Client" to create a file from scratch.<br>
-                3. <b>Analyse:</b> Once loaded, the Dashboard will activate automatically.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with c_safe:
-        st.markdown("""
-        <div class="guide-box" style="border-left-color: #58a6ff;">
-            <div class="guide-title">🔒 Privacy First</div>
-            <div class="guide-text">
-                This tool runs locally in your browser. <b>No participant data is stored on our servers.</b><br>
-                You own your database (JSON file). Save it to your secure drive after every session.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="disclaimer-text">
-        <b>DISCLAIMER:</b> This application is an independent tool for calculation and planning purposes only. 
-        It is not affiliated with the NDIA. Outputs should be verified against official PRODA data. 
-        Users are responsible for their own data security and compliance with the Privacy Act 1988.
+        <h1>Xyston Caseload Master</h1>
+        <p style="color: #8b949e; font-size: 18px;">The operating system for independent Support Coordinators.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.stop() # Stop here so the dashboard doesn't try to render empty data
-
-# ==============================================================================
-# ACTIVE DASHBOARD (DATA LOADED)
-# ==============================================================================
+    c_tut, c_dis = st.columns(2)
+    with c_tut:
+        st.markdown('<div class="guide-box"><div class="guide-title">🚀 Get Started</div><div class="guide-text">1. <b>Load Data:</b> Upload a JSON backup or CSV.<br>2. <b>Add Manual:</b> Use "Add Single Client".<br>3. <b>Analyse:</b> Dashboard activates automatically.</div></div>', unsafe_allow_html=True)
+    with c_dis:
+        st.markdown('<div class="guide-box" style="border-left-color: #58a6ff;"><div class="guide-title">🔒 Privacy First</div><div class="guide-text">Data is stored locally on your device. No participant data touches our servers. You own your JSON database file.</div></div>', unsafe_allow_html=True)
+    
+    st.stop()
 
 # Process Data
 all_metrics = [m for m in [calculate_client_metrics(c) for c in st.session_state.caseload] if m is not None]
@@ -284,31 +184,66 @@ c4.markdown(f"<div class='metric-card' style='border-color:{risk_col}'><div clas
 st.markdown("---")
 
 # TABS
-tab1, tab2 = st.tabs(["📊 Caseload Overview", "🔍 Participant Vault"])
+tab1, tab2 = st.tabs(["📊 Business Intelligence", "🔍 Participant Vault"])
 
+# --- TAB 1: BUSINESS INTELLIGENCE (BI) ---
 with tab1:
-    c_viz, c_data = st.columns([1, 2])
-    with c_viz:
-        st.markdown("### Viability Radar")
+    # Row 1: Risk & Revenue
+    r1_c1, r1_c2 = st.columns(2)
+    
+    with r1_c1:
+        st.markdown("#### 🚨 Risk Radar")
         if not df.empty:
             color_map = {"ROBUST SURPLUS": "#3fb950", "SUSTAINABLE": "#2ea043", "MONITORING REQUIRED": "#d29922", "CRITICAL SHORTFALL": "#f85149"}
-            fig = px.pie(df, names='status', color='status', color_discrete_map=color_map, hole=0.6)
-            fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
-        
+            fig_pie = px.pie(df, names='status', color='status', color_discrete_map=color_map, hole=0.6)
+            fig_pie.update_layout(showlegend=True, margin=dict(t=20,b=20,l=20,r=20), height=300, paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+    with r1_c2:
+        st.markdown("#### 💰 Revenue Forecast")
+        if not df.empty:
+            # Calculate revenue per level
+            rev_data = df.groupby('level')['weekly_cost'].sum().reset_index()
+            rev_data['Monthly Revenue'] = rev_data['weekly_cost'] * 4.33
+            
+            fig_bar = px.bar(rev_data, x='level', y='Monthly Revenue', color='level', 
+                             color_discrete_sequence=["#58a6ff", "#a371f7"], text_auto='.2s')
+            fig_bar.update_layout(showlegend=False, margin=dict(t=20,b=20,l=20,r=20), height=300, paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
+            fig_bar.update_xaxes(showticklabels=False, title=None)
+            fig_bar.update_yaxes(showgrid=True, gridcolor='#30363d')
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    # Row 2: Timeline & Health
+    r2_c1, r2_c2 = st.columns(2)
+    
+    with r2_c1:
+        st.markdown("#### 📅 Plan Expiry Timeline")
+        if not df.empty:
+            fig_scat = px.scatter(df, x='plan_end', y='surplus', color='status', 
+                                  size='weekly_cost', hover_name='name', 
+                                  color_discrete_map=color_map)
+            fig_scat.update_layout(height=300, margin=dict(t=20,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
+            fig_scat.update_yaxes(gridcolor='#30363d', title="Surplus/Deficit ($)")
+            fig_scat.update_xaxes(gridcolor='#30363d', title="Plan End Date")
+            st.plotly_chart(fig_scat, use_container_width=True)
+
+    with r2_c2:
+        st.markdown("#### 📉 Caseload Actions")
+        st.info("Generate a comprehensive Word document for your entire caseload for compliance and auditing.")
         report_doc = generate_caseload_report(all_metrics)
-        st.download_button("📄 Download Full Report (.docx)", report_doc, f"Caseload_Report_{datetime.date.today()}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True, type="primary")
+        st.download_button("📄 Download Master Report (.docx)", report_doc, f"Caseload_Report_{datetime.date.today()}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True, type="primary")
 
-    with c_data:
-        st.markdown("### Participant List")
-        display_df = df[['name', 'plan_end', 'status', 'runway_weeks', 'surplus']]
-        display_df.columns = ['Name', 'End Date', 'Health', 'Runway', 'Outcome']
-        st.dataframe(
-            display_df.style.format({'Outcome': "${:,.0f}", 'Runway': "{:.1f}"})
-            .applymap(lambda x: 'color:#f85149; font-weight:bold' if x=='CRITICAL SHORTFALL' else 'color:#3fb950' if x=='ROBUST SURPLUS' else '', subset=['Health']),
-            use_container_width=True, height=400
-        )
+    # Row 3: Full Data Table
+    st.markdown("#### 📋 Full Participant Register")
+    display_df = df[['name', 'plan_end', 'status', 'runway_weeks', 'surplus']]
+    display_df.columns = ['Name', 'End Date', 'Health', 'Runway', 'Outcome']
+    st.dataframe(
+        display_df.style.format({'Outcome': "${:,.0f}", 'Runway': "{:.1f}"})
+        .applymap(lambda x: 'color:#f85149; font-weight:bold' if x=='CRITICAL SHORTFALL' else 'color:#3fb950' if x=='ROBUST SURPLUS' else '', subset=['Health']),
+        use_container_width=True, height=400
+    )
 
+# --- TAB 2: CLIENT VAULT ---
 with tab2:
     c_sel, c_act = st.columns([3, 1])
     with c_sel:
@@ -335,19 +270,12 @@ with tab2:
         st.markdown("### Financial Trajectory")
         weeks_show = max(int(client_metrics['weeks_remaining']), 1) + 5
         dates = [datetime.date.today() + timedelta(weeks=w) for w in range(weeks_show)]
-        
         y_act = [max(0, client_metrics['balance'] - (w * client_metrics['weekly_cost'])) for w in range(len(dates))]
-        
         rem = client_metrics['weeks_remaining']
         ideal_wk = client_metrics['balance'] / rem if rem > 0 else 0
         y_opt = [max(0, client_metrics['balance'] - (w * ideal_wk)) for w in range(len(dates))]
         
-        chart_df = pd.DataFrame({
-            "Date": dates*2, 
-            "Balance": y_act + y_opt, 
-            "Type": ["Actual Trajectory"]*len(dates) + ["Ideal Path"]*len(dates)
-        })
-        
+        chart_df = pd.DataFrame({"Date": dates*2, "Balance": y_act + y_opt, "Type": ["Actual Trajectory"]*len(dates) + ["Ideal Path"]*len(dates)})
         fig = px.line(chart_df, x="Date", y="Balance", color="Type", color_discrete_map={"Actual Trajectory": client_metrics['color'], "Ideal Path": "#6e7681"})
         fig.update_traces(patch={"line": {"dash": "dot"}}, selector={"legendgroup": "Ideal Path"})
         try: fig.add_vline(x=client_metrics['plan_end'], line_dash="dash", line_color="#c9d1d9")
