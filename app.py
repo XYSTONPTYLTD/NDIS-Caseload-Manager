@@ -144,16 +144,17 @@ if not st.session_state.caseload:
     """, unsafe_allow_html=True)
 
     # 2. Support & Action
-    c_donate, c_empty = st.columns([1, 2]) # Centering hack
-    with c_empty:
-        pass
+    c_empty1, c_donate, c_empty2 = st.columns([1, 1, 1]) 
+    with c_donate:
+        st.markdown("""
+        <div style="display: flex; justify-content: center; margin: 20px 0;">
+            <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div style="display: flex; justify-content: center; margin: 20px 0;">
-        <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
-            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
-        </a>
-    </div>
     <p style="text-align: center; color: #8b949e; font-size: 12px; margin-bottom: 40px;">
         Your support keeps this tool free, secure, and up-to-date.
     </p>
@@ -323,15 +324,4 @@ with tab2:
                     with st.spinner("Consulting AI..."):
                         try:
                             genai.configure(api_key=api_key)
-                            model = genai.GenerativeModel('gemini-2.0-flash')
-                            prompt = f"Write a strategic NDIS file note for {selected_name}. Status: {client_metrics['status']}. Balance: ${client_metrics['balance']}. Burn: ${client_metrics['weekly_cost']}/wk. Outcome: ${client_metrics['surplus']}. Tone: Professional."
-                            response = model.generate_content(prompt)
-                            original_rec['notes'] = response.text
-                            st.rerun()
-                        except Exception as e: st.error(f"Error: {e}")
-                else: st.error("No API Key.")
-        
-        with c_note:
-            st.markdown("### 📝 Notes")
-            new_note = st.text_area("Editor", value=original_rec.get('notes', ''), height=150, label_visibility="collapsed")
-            if new_note != original_rec.get('notes', ''): original_rec['notes'] = new_note
+                            model = genai.GenerativeModel('gemini-2.0-flash
