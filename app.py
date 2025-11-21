@@ -62,6 +62,13 @@ st.markdown("""
     }
     .link-btn:hover { background-color: #30363d; color: #fff; border-color: #8b949e; }
     
+    .link-row a {
+        text-decoration: none; color: #58a6ff; font-size: 13px; display: block;
+        padding: 6px 8px; margin: 2px 0; border-radius: 4px; background: #161b22;
+        border: 1px solid #30363d; transition: all 0.2s;
+    }
+    .link-row a:hover { background: #238636; color: white; border-color: #2ea043; padding-left: 15px; }
+
     .disclaimer-text { font-size: 0.75em; color: #484f58; text-align: center; margin-top: 30px; }
     
     /* BUTTONS */
@@ -218,7 +225,7 @@ if not st.session_state.caseload:
     </div>
     """, unsafe_allow_html=True)
     
-    st.stop() # Stop here so the dashboard doesn't try to render empty data
+    st.stop()
 
 # ==============================================================================
 # ACTIVE DASHBOARD (DATA LOADED)
@@ -324,4 +331,15 @@ with tab2:
                     with st.spinner("Consulting AI..."):
                         try:
                             genai.configure(api_key=api_key)
-                            model = genai.GenerativeModel('gemini-2.0-flash
+                            model = genai.GenerativeModel('gemini-2.0-flash')
+                            prompt = f"Write a strategic NDIS file note for {selected_name}. Status: {client_metrics['status']}. Balance: ${client_metrics['balance']}. Burn: ${client_metrics['weekly_cost']}/wk. Outcome: ${client_metrics['surplus']}. Tone: Professional Australian NDIS."
+                            response = model.generate_content(prompt)
+                            original_rec['notes'] = response.text
+                            st.rerun()
+                        except Exception as e: st.error(f"Error: {e}")
+                else: st.error("No API Key.")
+        
+        with c_note:
+            st.markdown("### 📝 Notes")
+            new_note = st.text_area("Editor", value=original_rec.get('notes', ''), height=150, label_visibility="collapsed")
+            if new_note != original_rec.get('notes', ''): original_rec['notes'] = new_note
