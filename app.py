@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import json
 import datetime
-from datetime import timedelta # <--- This was the missing key
+from datetime import timedelta
 import uuid
 import google.generativeai as genai
 from utils import calculate_client_metrics, generate_caseload_report, RATES
@@ -35,7 +35,7 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<h1 style='text-align:center; margin-bottom:0;'>🛡️</h1>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center; margin-top:0; letter-spacing:2px;'>XYSTON</h2>", unsafe_allow_html=True)
-    st.caption("Caseload Manager v2.1")
+    st.caption("Caseload Manager v2.2")
     
     # API Key Input
     api_key = st.secrets.get("GEMINI_API_KEY", None)
