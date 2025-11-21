@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import json
 import datetime
-from datetime import timedelta  # <--- This was the missing import causing the crash
+from datetime import timedelta # Fixed the crash error
 import uuid
 import google.generativeai as genai
 from utils import calculate_client_metrics, generate_caseload_report, generate_csv_template, process_csv_upload, RATES
@@ -16,9 +16,13 @@ st.set_page_config(page_title="XYSTON Caseload Master", layout="wide", page_icon
 if 'caseload' not in st.session_state:
     st.session_state.caseload = []
 
+# INJECT CUSTOM CSS
 st.markdown("""
 <style>
+    /* GLOBAL THEME */
     .stApp { background-color: #0d1117; font-family: 'Segoe UI', sans-serif; }
+    
+    /* CARDS */
     .metric-card {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -29,13 +33,32 @@ st.markdown("""
     }
     .metric-val { font-size: 24px; font-weight: 800; color: #ffffff; }
     .metric-lbl { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+    
+    /* LINKS & BUTTONS */
     .link-row a {
-        text-decoration: none; color: #58a6ff; font-size: 13px; display: block;
-        padding: 6px 8px; margin: 2px 0; border-radius: 4px; background: #161b22;
-        border: 1px solid #30363d; transition: all 0.2s;
+        text-decoration: none;
+        color: #58a6ff;
+        font-size: 13px;
+        display: block;
+        padding: 6px 8px;
+        margin: 2px 0;
+        border-radius: 4px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        transition: all 0.2s;
     }
     .link-row a:hover { background: #238636; color: white; border-color: #2ea043; padding-left: 15px; }
-    .stButton button { width: 100%; border-radius: 6px; font-weight: 600; }
+    
+    .stButton button {
+        width: 100%;
+        background-color: #21262d;
+        color: #c9d1d9;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+    .stButton button:hover { color: #fff; border-color: #8b949e; }
+    div[data-testid="stButton"] button[kind="primary"] { background-color: #238636; border-color: #2ea043; color: #fff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -43,16 +66,17 @@ st.markdown("""
 # 2. SIDEBAR
 # ==============================================================================
 with st.sidebar:
-    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v3.6</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v3.7</p></div>", unsafe_allow_html=True)
     
     api_key = st.secrets.get("GEMINI_API_KEY", None)
     if not api_key:
         with st.expander("🔐 AI Settings"):
             api_key = st.text_input("Google API Key", type="password")
 
-    # DATA TOOLS
+    # --- DATA & TEMPLATES ---
     with st.expander("📂 Import / Export", expanded=True):
         tab_json, tab_csv = st.tabs(["Backup", "Bulk Import"])
+        
         with tab_json:
             if st.session_state.caseload:
                 st.download_button("💾 Save Database", json.dumps(st.session_state.caseload, default=str), "caseload_backup.json", "application/json", use_container_width=True)
@@ -62,9 +86,10 @@ with st.sidebar:
                     st.session_state.caseload = json.load(uploaded_json)
                     st.success(f"Loaded {len(st.session_state.caseload)} clients!")
                     st.rerun()
-                except: st.error("Error loading JSON")
+                except: st.error("Error")
 
         with tab_csv:
+            st.caption("Use this for Excel editing")
             csv_template = generate_csv_template()
             st.download_button("📄 Get CSV Template", csv_template, "client_template.csv", "text/csv", use_container_width=True)
             uploaded_csv = st.file_uploader("Import CSV", type=['csv'], label_visibility="collapsed", key="csv_up")
@@ -74,8 +99,9 @@ with st.sidebar:
                     st.session_state.caseload.extend(new_data)
                     st.success(f"Imported {len(new_data)} clients!")
                     st.rerun()
+                else: st.error("Check format.")
 
-    # ADD CLIENT
+    # --- ADD SINGLE ---
     with st.expander("➕ Add Single Client", expanded=False):
         with st.form("add_form"):
             name = st.text_input("Name")
@@ -90,44 +116,65 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # COMMAND CENTRE
+    # --- COMMAND CENTRE (The Full Link List) ---
     st.markdown("---")
-    with st.expander("⚡ Quick Access"):
+    st.caption("COMMAND CENTRE")
+    
+    with st.expander("⚡ Admin & Banking"):
+        st.markdown("""
+        <div class="link-row">
+            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
+            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
+            <hr style="border-color:#333; margin:5px 0;">
+            <a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a>
+            <a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a>
+            <a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a>
+            <a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with st.expander("🏛️ NDIS Compliance"):
         st.markdown("""
         <div class="link-row">
             <a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a>
-            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
-            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
             <a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a>
             <a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a>
+            <a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a>
+            <a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a>
+            <a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a>
         </div>
         """, unsafe_allow_html=True)
-    st.markdown('<div style="text-align:center; margin-top:10px;"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:140px;"></a></div>', unsafe_allow_html=True)
+        
+    st.markdown("---")
+    st.markdown('<div style="text-align:center"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:160px;"></a></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. DASHBOARD LOGIC
+# 3. DASHBOARD
 # ==============================================================================
 
-# HERO SCREEN (Zero State)
+# HERO SCREEN
 if not st.session_state.caseload:
     st.markdown("""
-    <div style="text-align: center; padding: 60px 20px;">
-        <h1 style="font-size: 60px; margin-bottom: 10px;">🛡️</h1>
-        <h1>Welcome to Caseload Master</h1>
-        <p style="color: #8b949e; font-size: 18px;">Your compliant, secure NDIS operating system.</p>
-        <div style="margin-top: 30px; padding: 20px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; display: inline-block; text-align: left;">
-            <p style="color:#fff;"><strong>👉 Get Started:</strong></p>
-            <ol style="color: #c9d1d9;">
-                <li>Open the sidebar <b>(Import / Export)</b>.</li>
-                <li>Click <b>Add Single Client</b> to start manually.</li>
-                <li>Or upload a JSON backup if you have one.</li>
-            </ol>
+    <div style="text-align: center; padding: 40px;">
+        <h1 style="font-size: 50px; margin-bottom: 10px;">🛡️</h1>
+        <h1>Xyston Caseload Master</h1>
+        <p style="color: #8b949e; font-size: 18px;">The operating system for independent coordinators.</p>
+        <br>
+        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+            <div class="metric-card" style="width: 250px; text-align:left;">
+                <div style="font-size: 20px;">📂 <b>Bulk Import</b></div>
+                <div style="color: #8b949e; font-size: 14px; margin-top:5px;">Download the CSV template, fill it in Excel, and upload it to populate your dashboard instantly.</div>
+            </div>
+            <div class="metric-card" style="width: 250px; text-align:left;">
+                <div style="font-size: 20px;">💾 <b>Secure Backup</b></div>
+                <div style="color: #8b949e; font-size: 14px; margin-top:5px;">Your data stays on your device. Save and Load your full database securely via JSON.</div>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
-# Process Data
+# CALC METRICS
 all_metrics = [m for m in [calculate_client_metrics(c) for c in st.session_state.caseload] if m is not None]
 df = pd.DataFrame(all_metrics)
 
@@ -155,59 +202,12 @@ with tab1:
         if not df.empty:
             color_map = {"ROBUST SURPLUS": "#3fb950", "SUSTAINABLE": "#2ea043", "MONITORING REQUIRED": "#d29922", "CRITICAL SHORTFALL": "#f85149"}
             fig = px.pie(df, names='status', color='status', color_discrete_map=color_map, hole=0.6)
-            fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
+            fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250, paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
             st.plotly_chart(fig, use_container_width=True)
         
         report_doc = generate_caseload_report(all_metrics)
-        st.download_button("📄 Download Full Report (.docx)", report_doc, f"Caseload_Report_{datetime.date.today()}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True, type="primary")
+        st.download_button("📄 Download Full Report (.docx)", report_doc, f"Report_{datetime.date.today()}.docx", "application/msword", use_container_width=True, type="primary")
 
     with c_data:
         st.markdown("### Participant List")
-        display_df = df[['name', 'plan_end', 'status', 'runway_weeks', 'surplus']]
-        display_df.columns = ['Name', 'End Date', 'Health', 'Runway', 'Outcome']
-        st.dataframe(
-            display_df.style.format({'Outcome': "${:,.0f}", 'Runway': "{:.1f}"})
-            .applymap(lambda x: 'color:#f85149; font-weight:bold' if x=='CRITICAL SHORTFALL' else 'color:#3fb950' if x=='ROBUST SURPLUS' else '', subset=['Health']),
-            use_container_width=True, height=400
-        )
-
-with tab2:
-    c_sel, c_act = st.columns([3, 1])
-    with c_sel:
-        selected_name = st.selectbox("Select Participant", df['name'].unique(), label_visibility="collapsed")
-    
-    if selected_name:
-        client_metrics = next((m for m in all_metrics if m["name"] == selected_name), None)
-        original_rec = next((c for c in st.session_state.caseload if c["id"] == client_metrics["id"]), None)
-        
-        with c_act:
-            if st.button("🗑️ Remove Participant"):
-                st.session_state.caseload = [c for c in st.session_state.caseload if c['id'] != client_metrics['id']]
-                st.success("Deleted.")
-                st.rerun()
-
-        st.markdown(f"<div style='background:{client_metrics['color']}10; border-left:5px solid {client_metrics['color']}; padding:15px; border-radius:4px; margin-bottom:20px;'><h2 style='margin:0; color:{client_metrics['color']};'>{client_metrics['status']}</h2><p style='margin:5px 0 0 0; color:#8b949e;'>Plan ends {client_metrics['plan_end'].strftime('%d %b %Y')} • {client_metrics['weeks_remaining']:.1f} wks left</p></div>", unsafe_allow_html=True)
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Balance", f"${client_metrics['balance']:,.2f}")
-        m2.metric("Burn", f"${client_metrics['weekly_cost']:,.2f}/wk", f"{client_metrics['hours']}h/wk")
-        m3.metric("Outcome", f"${client_metrics['surplus']:,.0f}", "Surplus" if client_metrics['surplus'] > 0 else "Deficit")
-
-        # Chart (Fixed for Crash)
-        st.markdown("### 📉 Financial Trajectory")
-        weeks_to_show = max(int(client_metrics['weeks_remaining']), 1) + 5
-        dates = [datetime.date.today() + timedelta(weeks=w) for w in range(weeks_to_show)]
-        
-        y_act = [max(0, client_metrics['balance'] - (w * client_metrics['weekly_cost'])) for w in range(len(dates))]
-        
-        rem = client_metrics['weeks_remaining']
-        ideal_wk = client_metrics['balance'] / rem if rem > 0 else 0
-        y_opt = [max(0, client_metrics['balance'] - (w * ideal_wk)) for w in range(len(dates))]
-        
-        chart_df = pd.DataFrame({
-            "Date": dates*2, 
-            "Balance": y_act + y_opt, 
-            "Type": ["Actual Trajectory"]*len(dates) + ["Ideal Path"]*len(dates)
-        })
-        
-        fig = px.line(chart_df, x="Date", y="Balance", color="Type", color_discrete
+        display_df = df[['name
