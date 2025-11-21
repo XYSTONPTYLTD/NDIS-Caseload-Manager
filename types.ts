@@ -18,7 +18,7 @@ export interface Client {
   rate: number;
   budget: number;
   balance: number;
-  plan_end: string; // YYYY-MM-DD
+  plan_end: string; // ISO String YYYY-MM-DD
   hours: number;
   notes: string;
 }
