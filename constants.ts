@@ -1,4 +1,4 @@
-import { ClientStatus, SupportLevel } from './types';
+import { SupportLevel, ClientStatus } from './types';
 
 export const RATES: Record<string, number> = {
   [SupportLevel.Level2]: 100.14,
@@ -6,10 +6,10 @@ export const RATES: Record<string, number> = {
 };
 
 export const STATUS_COLORS: Record<ClientStatus, string> = {
-  [ClientStatus.RobustSurplus]: "#10b981", // Emerald (Safe)
-  [ClientStatus.Sustainable]: "#22c55e", // Green
-  [ClientStatus.MonitoringRequired]: "#eab308", // Yellow
-  [ClientStatus.CriticalShortfall]: "#ef4444"  // Red
+  [ClientStatus.RobustSurplus]: "#3fb950", // Emerald (Safe)
+  [ClientStatus.Sustainable]: "#2ea043",   // Green (On Track)
+  [ClientStatus.MonitoringRequired]: "#d29922", // Yellow (Watch)
+  [ClientStatus.CriticalShortfall]: "#f85149"   // Red (Danger)
 };
 
 export const CSV_HEADERS = [
