@@ -30,10 +30,10 @@ def calculate_client_metrics(c):
             try:
                 plan_end = datetime.datetime.strptime(str(plan_end_str), "%Y-%m-%d").date()
             except:
-                plan_end = datetime.datetime.strptime(str(plan_end_str).split('T')[0], "%Y-%m-%d").date()
+                # Fallback if date is missing or corrupted
+                plan_end = datetime.date.today() + timedelta(weeks=40)
             
     except Exception as e:
-        # Fallback for bad data
         return None
 
     # 2. Time Calculations
@@ -42,8 +42,11 @@ def calculate_client_metrics(c):
     
     # 3. Financial Calculations
     weekly_cost = hours * rate
-    runway_weeks = balance / weekly_cost if weekly_cost > 0 else 999
-    
+    if weekly_cost > 0:
+        runway_weeks = balance / weekly_cost
+    else:
+        runway_weeks = 999
+        
     required_to_finish = weekly_cost * weeks_remaining
     surplus = balance - required_to_finish
     
@@ -69,8 +72,8 @@ def calculate_client_metrics(c):
 
     return {
         "id": c.get('id'),
-        "name": c.get('name'),
-        "ndis_number": c.get('ndis_number'),
+        "name": c.get('name', 'Unknown'),
+        "ndis_number": c.get('ndis_number', ''),
         "level": c.get('level'),
         "budget": total_budget,
         "balance": balance,
@@ -88,19 +91,23 @@ def calculate_client_metrics(c):
         "notes": c.get('notes', '')
     }
 
-# --- REPORT GENERATOR ---
-# Renamed to match your import error
+# --- WORD REPORT GENERATOR ---
 def generate_caseload_report(caseload_data):
     """Generates a professional Word doc for the whole caseload."""
     doc = Document()
     
-    # Title Page
+    # Style Helper
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(10)
+
+    # 1. TITLE PAGE
     doc.add_heading('XYSTON | Caseload Master Report', 0)
     doc.add_paragraph(f"Date: {datetime.date.today().strftime('%d %B %Y')}")
     doc.add_paragraph("Confidential: Internal Use Only")
     doc.add_page_break()
     
-    # Executive Summary
+    # 2. EXECUTIVE SUMMARY
     doc.add_heading('Executive Summary', 1)
     total_funds = sum(c['balance'] for c in caseload_data)
     monthly_rev = sum(c['weekly_cost'] for c in caseload_data) * 4.33
@@ -118,7 +125,7 @@ def generate_caseload_report(caseload_data):
             
     doc.add_page_break()
     
-    # Individual Files
+    # 3. INDIVIDUAL FILES
     for c in caseload_data:
         doc.add_heading(f"{c['name']} ({c['ndis_number']})", 1)
         
@@ -144,7 +151,7 @@ def generate_caseload_report(caseload_data):
             
         doc.add_page_break()
         
-    # Save
+    # Save to memory
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
