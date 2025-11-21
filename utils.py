@@ -26,7 +26,11 @@ def calculate_client_metrics(c):
         if isinstance(plan_end_str, (datetime.date, datetime.datetime)):
             plan_end = plan_end_str
         else:
-            plan_end = datetime.datetime.strptime(plan_end_str, "%Y-%m-%d").date()
+            # Handle string dates if loaded from JSON
+            try:
+                plan_end = datetime.datetime.strptime(str(plan_end_str), "%Y-%m-%d").date()
+            except:
+                plan_end = datetime.datetime.strptime(str(plan_end_str).split('T')[0], "%Y-%m-%d").date()
             
     except Exception as e:
         # Fallback for bad data
@@ -85,7 +89,8 @@ def calculate_client_metrics(c):
     }
 
 # --- REPORT GENERATOR ---
-def generate_master_report(caseload_data):
+# Renamed to match your import error
+def generate_caseload_report(caseload_data):
     """Generates a professional Word doc for the whole caseload."""
     doc = Document()
     
