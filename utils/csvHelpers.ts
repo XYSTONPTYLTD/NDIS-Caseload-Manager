@@ -9,13 +9,33 @@ export const generateTemplate = () => {
             "Name": "John Doe",
             "NDIS Number": "430123456",
             "Support Level": "Level 2: Coordination of Supports",
-            "Total Budget": 18000,
-            "Current Balance": 15000,
-            "Plan End Date (YYYY-MM-DD)": new Date(new Date().setDate(new Date().getDate() + 280)).toISOString().split('T')[0],
-            "Hours Per Week": 1.5
+            "Total Budget": "18000",
+            "Current Balance": "15000",
+            "Plan End Date": "2025-12-31",
+            "Hours Per Week": "1.5"
         }
     ];
     return Papa.unparse(data);
+};
+
+const cleanNumber = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    // Remove '$', ',', and spaces
+    const clean = val.toString().replace(/[$,\s]/g, '');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+};
+
+const cleanDate = (val: any): string => {
+    if (!val) return new Date().toISOString().split('T')[0]; // Default to today
+    try {
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+        return d.toISOString().split('T')[0];
+    } catch {
+        return new Date().toISOString().split('T')[0];
+    }
 };
 
 export const parseClientCSV = (file: File): Promise<Client[]> => {
@@ -26,28 +46,31 @@ export const parseClientCSV = (file: File): Promise<Client[]> => {
             complete: (results) => {
                 try {
                     const clients: Client[] = results.data.map((row: any) => {
-                        // Safe Defaults
-                        const levelStr = row["Support Level"] || "Level 2: Coordination of Supports";
-                        const level = Object.values(SupportLevel).includes(levelStr) 
-                            ? levelStr 
-                            : SupportLevel.Level2;
+                        // Normalize Support Level
+                        let level = row["Support Level"] || SupportLevel.Level2;
+                        // Logic to map "Level 2" text to the Enum if needed, else default
+                        if (!Object.values(SupportLevel).includes(level)) {
+                             level = SupportLevel.Level2; 
+                        }
+
                         const rate = RATES[level] || 100.14;
                         
                         return {
                             id: uuidv4(),
-                            name: row["Name"] || "Unknown",
+                            name: row["Name"] || "Unknown Participant",
                             ndis_number: row["NDIS Number"] || "",
                             level: level,
                             rate: rate,
-                            budget: parseFloat(row["Total Budget"] || "0"),
-                            balance: parseFloat(row["Current Balance"] || "0"),
-                            plan_end: row["Plan End Date (YYYY-MM-DD)"] || new Date().toISOString().split('T')[0],
-                            hours: parseFloat(row["Hours Per Week"] || "0"),
+                            budget: cleanNumber(row["Total Budget"]),
+                            balance: cleanNumber(row["Current Balance"]),
+                            plan_end: cleanDate(row["Plan End Date"] || row["Plan End Date (YYYY-MM-DD)"]),
+                            hours: cleanNumber(row["Hours Per Week"]),
                             notes: ""
                         };
                     });
                     resolve(clients);
                 } catch (err) {
+                    console.error("CSV Parsing Error:", err);
                     reject(err);
                 }
             },
