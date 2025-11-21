@@ -49,7 +49,7 @@ st.markdown("""
         font-weight: 600;
         font-size: 0.9em;
     }
-    .link-btn:hover { background-color: #30363d; color: #fff; border-color: #8b949e; }
+    .link-btn:hover { background-color: #30669d; color: #fff; border-color: #8b949e; }
     
     .link-row a {
         text-decoration: none; color: #58a6ff; font-size: 13px; display: block;
@@ -57,7 +57,7 @@ st.markdown("""
         border: 1px solid #30363d; transition: all 0.2s;
     }
     .link-row a:hover { background: #238636; color: white; border-color: #2ea043; padding-left: 15px; }
-    
+
     /* GUIDE BOXES */
     .guide-box { background-color: #161b22; border-left: 4px solid #238636; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
     .guide-title { font-weight: bold; color: #fff; margin-bottom: 5px; font-size: 1.1em; }
@@ -90,7 +90,7 @@ with st.sidebar:
                 try:
                     st.session_state.caseload = json.load(uploaded_json)
                     st.success(f"Loaded {len(st.session_state.caseload)} clients!")
-                    # removed rerun to prevent loop
+                    st.rerun()
                 except: st.error("Error loading JSON")
 
         with tab_csv:
@@ -101,7 +101,6 @@ with st.sidebar:
             with st.form("csv_upload_form", clear_on_submit=True):
                 uploaded_csv = st.file_uploader("Import CSV", type=['csv'], label_visibility="collapsed")
                 submitted = st.form_submit_button("Import Data")
-                
                 if submitted and uploaded_csv:
                     new_data = process_csv_upload(uploaded_csv)
                     if new_data:
@@ -109,7 +108,7 @@ with st.sidebar:
                         st.success(f"Imported {len(new_data)} clients!")
                         st.rerun()
                     else:
-                        st.error("Format Error. Please use the template.")
+                        st.error("Format Error. Use the template.")
 
     # ADD CLIENT
     with st.expander("➕ Add Single Client", expanded=False):
@@ -126,34 +125,15 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # COMMAND CENTRE (Updated with Categories)
+    # COMMAND CENTRE
     st.markdown("---")
     st.caption("COMMAND CENTRE")
     
     with st.expander("⚡ Admin & Banking"):
-        st.markdown("""
-        <div class="link-row">
-            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
-            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
-            <hr style="border-color:#333; margin:5px 0;">
-            <a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a>
-            <a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a>
-            <a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a>
-            <a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="link-row"><a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a><a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a><hr style="border-color:#333; margin:5px 0;"><a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a><a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a><a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a><a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a></div>', unsafe_allow_html=True)
 
     with st.expander("🏛️ NDIS Compliance"):
-        st.markdown("""
-        <div class="link-row">
-            <a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a>
-            <a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a>
-            <a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a>
-            <a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a>
-            <a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a>
-            <a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="link-row"><a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a><a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a><a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a><a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a><a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a><a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a></div>', unsafe_allow_html=True)
         
     st.markdown("---")
     st.markdown('<div style="text-align:center"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:160px;"></a></div>', unsafe_allow_html=True)
@@ -326,7 +306,6 @@ with tab2:
 
         # Chart
         st.markdown("### Financial Trajectory")
-        # Fix: Safe range generation to avoid crash
         weeks_show = max(int(client_metrics['weeks_remaining']), 1) + 5
         dates = [datetime.date.today() + timedelta(weeks=w) for w in range(weeks_show)]
         
