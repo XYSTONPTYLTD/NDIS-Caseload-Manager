@@ -5,6 +5,8 @@ import json
 import datetime
 from datetime import timedelta
 import uuid
+import requests
+import pytz
 import google.generativeai as genai
 from utils import calculate_client_metrics, generate_caseload_report, generate_csv_template, process_csv_upload, RATES
 
@@ -22,44 +24,31 @@ st.markdown("""
     /* GLOBAL THEME */
     .stApp { background-color: #0d1117; font-family: 'Segoe UI', sans-serif; }
     
-    /* CARDS */
+    /* METRIC CARDS (Active Dashboard) */
     .metric-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        background-color: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .metric-val { font-size: 24px; font-weight: 800; color: #ffffff; }
     .metric-lbl { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
     
-    /* CHART CONTAINERS */
-    .chart-container {
+    /* WEATHER CARDS */
+    .weather-card {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 8px;
         padding: 15px;
-        margin-bottom: 15px;
-    }
-    
-    /* LINKS & BUTTONS */
-    .link-btn {
-        display: block;
         text-align: center;
-        background-color: #21262d;
-        color: #58a6ff;
-        padding: 10px;
-        border-radius: 6px;
-        text-decoration: none;
-        border: 1px solid #30363d;
         margin-bottom: 10px;
-        transition: all 0.2s;
-        font-weight: 600;
-        font-size: 0.9em;
+        transition: transform 0.2s;
     }
-    .link-btn:hover { background-color: #30363d; color: #fff; border-color: #8b949e; }
+    .weather-card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+    .city-name { font-size: 14px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+    .city-time { font-size: 20px; font-weight: 300; color: #58a6ff; font-family: monospace; margin: 5px 0; }
+    .weather-row { display: flex; justify-content: space-between; font-size: 12px; color: #c9d1d9; margin-top: 8px; padding-top: 8px; border-top: 1px solid #30363d; }
+    .weather-temp { font-weight: bold; color: #fff; }
     
+    /* SIDEBAR LINKS */
     .link-row a {
         text-decoration: none; color: #58a6ff; font-size: 13px; display: block;
         padding: 6px 8px; margin: 2px 0; border-radius: 4px; background: #161b22;
@@ -78,7 +67,61 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SIDEBAR
+# 2. WEATHER UTILITIES
+# ==============================================================================
+CAPITALS = {
+    "Canberra": {"lat": -35.28, "lng": 149.13, "tz": "Australia/Canberra"},
+    "Sydney": {"lat": -33.86, "lng": 151.20, "tz": "Australia/Sydney"},
+    "Melbourne": {"lat": -37.81, "lng": 144.96, "tz": "Australia/Melbourne"},
+    "Brisbane": {"lat": -27.47, "lng": 153.02, "tz": "Australia/Brisbane"},
+    "Perth": {"lat": -31.95, "lng": 115.86, "tz": "Australia/Perth"},
+    "Adelaide": {"lat": -34.92, "lng": 138.60, "tz": "Australia/Adelaide"},
+    "Hobart": {"lat": -42.88, "lng": 147.32, "tz": "Australia/Hobart"},
+    "Darwin": {"lat": -12.46, "lng": 130.84, "tz": "Australia/Darwin"},
+}
+
+def get_weather_icon(code):
+    if code <= 1: return "☀️"
+    if code <= 3: return "⛅"
+    if code <= 48: return "🌫️"
+    if code <= 67: return "🌧️"
+    if code <= 77: return "🌨️"
+    if code <= 82: return "⛈️"
+    return "🌦️"
+
+@st.cache_data(ttl=3600) # Cache for 1 hour
+def fetch_weather():
+    weather_data = {}
+    for city, coords in CAPITALS.items():
+        try:
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={coords['lat']}&longitude={coords['lng']}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto"
+            res = requests.get(url).json()
+            
+            # Current
+            curr_temp = round(res['current']['temperature_2m'])
+            curr_code = res['current']['weather_code']
+            
+            # Tomorrow
+            tmrw_max = round(res['daily']['temperature_2m_max'][1])
+            tmrw_code = res['daily']['weather_code'][1]
+            
+            # Time
+            tz = pytz.timezone(coords['tz'])
+            local_time = datetime.datetime.now(tz).strftime("%I:%M %p")
+            
+            weather_data[city] = {
+                "time": local_time,
+                "curr_temp": curr_temp,
+                "curr_icon": get_weather_icon(curr_code),
+                "tmrw_temp": tmrw_max,
+                "tmrw_icon": get_weather_icon(tmrw_code)
+            }
+        except:
+            weather_data[city] = None
+    return weather_data
+
+# ==============================================================================
+# 3. SIDEBAR
 # ==============================================================================
 with st.sidebar:
     st.markdown("<div style='text-align:center; padding:15px 0;'><h1 style='margin:0; font-size:40px;'>🛡️</h1><h3 style='margin:0; color:white; letter-spacing:2px;'>XYSTON</h3><p style='color:#8b949e; font-size:10px; letter-spacing:1px;'>CASELOAD MASTER v6.0</p></div>", unsafe_allow_html=True)
@@ -99,7 +142,7 @@ with st.sidebar:
                 try:
                     st.session_state.caseload = json.load(uploaded_json)
                     st.success(f"Loaded {len(st.session_state.caseload)} clients!")
-                    st.rerun()
+                    # No rerun loop
                 except: st.error("Error loading JSON")
 
         with tab_csv:
@@ -132,44 +175,120 @@ with st.sidebar:
                 st.session_state.caseload.append(new_c)
                 st.rerun()
 
-    # COMMAND CENTRE
+    # COMMAND CENTRE (SIDEBAR ONLY)
     st.markdown("---")
     st.caption("COMMAND CENTRE")
+    
     with st.expander("⚡ Admin & Banking"):
-        st.markdown('<div class="link-row"><a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a><a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a><hr style="border-color:#333; margin:5px 0;"><a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth</a><a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a><a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a><a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a></div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="link-row">
+            <a href="https://secure.employmenthero.com/login" target="_blank">👤 Employment Hero HR</a>
+            <a href="https://login.xero.com/" target="_blank">📊 Xero Accounting</a>
+            <hr style="border-color:#333; margin:5px 0;">
+            <a href="https://www.commbank.com.au/" target="_blank">🏦 Commonwealth Bank</a>
+            <a href="https://www.westpac.com.au/" target="_blank">🏦 Westpac</a>
+            <a href="https://www.anz.com.au/" target="_blank">🏦 ANZ</a>
+            <a href="https://www.nab.com.au/" target="_blank">🏦 NAB</a>
+        </div>
+        """, unsafe_allow_html=True)
+
     with st.expander("🏛️ NDIS Compliance"):
-        st.markdown('<div class="link-row"><a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a><a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a><a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a><a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a></div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="link-row">
+            <a href="https://proda.humanservices.gov.au/" target="_blank">🔐 PACE / PRODA Login</a>
+            <a href="https://www.ndis.gov.au/providers/pricing-arrangements" target="_blank">💰 Pricing Arrangements</a>
+            <a href="https://ourguidelines.ndis.gov.au/" target="_blank">📜 Operational Guidelines</a>
+            <a href="https://www.legislation.gov.au/Details/C2013A00020" target="_blank">⚖️ NDIS Act 2013</a>
+            <a href="https://www.ndiscommission.gov.au/" target="_blank">🛡️ NDIS Commission</a>
+            <a href="https://www.ndis.gov.au/news" target="_blank">📰 News & Reviews</a>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown('<div style="text-align:center"><a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="width:160px;"></a></div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. DASHBOARD LOGIC
+# 3. MAIN DASHBOARD (ZERO STATE)
 # ==============================================================================
 
-# HERO SCREEN
 if not st.session_state.caseload:
     st.markdown("""
-    <div style="text-align: center; padding: 40px;">
+    <div style="text-align: center; padding: 40px 20px 20px 20px;">
         <h1 style="font-size: 50px; margin-bottom: 10px;">🛡️</h1>
-        <h1>Xyston Caseload Master</h1>
-        <p style="color: #8b949e; font-size: 18px;">The operating system for independent Support Coordinators.</p>
+        <h1 style="margin-bottom: 10px;">Xyston Caseload Master</h1>
+        <p style="color: #8b949e; font-size: 18px; max-width: 700px; margin: 0 auto;">
+            The operating system for independent Support Coordinators.
+        </p>
     </div>
     """, unsafe_allow_html=True)
+
+    # --- WEATHER DASHBOARD ---
+    st.markdown("### 🇦🇺 National Dashboard")
+    weather = fetch_weather()
     
-    c_tut, c_dis = st.columns(2)
-    with c_tut:
+    # Create 2 Rows of 4 Capitals
+    row1 = st.columns(4)
+    cities_1 = ["Canberra", "Sydney", "Melbourne", "Brisbane"]
+    for i, city in enumerate(cities_1):
+        w = weather.get(city)
+        if w:
+            row1[i].markdown(f"""
+            <div class="weather-card">
+                <div class="city-name">{city}</div>
+                <div class="city-time">{w['time']}</div>
+                <div class="weather-row">
+                    <div>TODAY<br><span class="weather-temp">{w['curr_icon']} {w['curr_temp']}°</span></div>
+                    <div style="border-left:1px solid #30363d;"></div>
+                    <div>TOMORROW<br><span class="weather-temp">{w['tmrw_icon']} {w['tmrw_temp']}°</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    row2 = st.columns(4)
+    cities_2 = ["Perth", "Adelaide", "Hobart", "Darwin"]
+    for i, city in enumerate(cities_2):
+        w = weather.get(city)
+        if w:
+            row2[i].markdown(f"""
+            <div class="weather-card">
+                <div class="city-name">{city}</div>
+                <div class="city-time">{w['time']}</div>
+                <div class="weather-row">
+                    <div>TODAY<br><span class="weather-temp">{w['curr_icon']} {w['curr_temp']}°</span></div>
+                    <div style="border-left:1px solid #30363d;"></div>
+                    <div>TOMORROW<br><span class="weather-temp">{w['tmrw_icon']} {w['tmrw_temp']}°</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # DONATION & FOOTER
+    st.markdown("---")
+    c_empty1, c_donate, c_empty2 = st.columns([1, 1, 1]) 
+    with c_donate:
+        st.markdown("""
+        <div style="display: flex; justify-content: center; margin: 20px 0;">
+            <a href="https://www.buymeacoffee.com/h0m1ez187" target="_blank">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important; width: 180px !important;" >
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # GUIDES
+    c_how, c_safe = st.columns(2)
+    with c_how:
         st.markdown('<div class="guide-box"><div class="guide-title">🚀 Get Started</div><div class="guide-text">1. <b>Load Data:</b> Upload a JSON backup or CSV.<br>2. <b>Add Manual:</b> Use "Add Single Client".<br>3. <b>Analyse:</b> Dashboard activates automatically.</div></div>', unsafe_allow_html=True)
-    with c_dis:
+    with c_safe:
         st.markdown('<div class="guide-box" style="border-left-color: #58a6ff;"><div class="guide-title">🔒 Privacy First</div><div class="guide-text">Data is stored locally on your device. No participant data touches our servers. You own your JSON database file.</div></div>', unsafe_allow_html=True)
     
     st.stop()
 
-# Process Data
+# ==============================================================================
+# ACTIVE DASHBOARD (DATA LOADED)
+# ==============================================================================
+
 all_metrics = [m for m in [calculate_client_metrics(c) for c in st.session_state.caseload] if m is not None]
 df = pd.DataFrame(all_metrics)
 
-# TOP STATS
 total_funds = df['balance'].sum()
 monthly_rev = df['weekly_cost'].sum() * 4.33
 risk_count = len(df[df['status'] == 'CRITICAL SHORTFALL'])
@@ -183,67 +302,31 @@ c4.markdown(f"<div class='metric-card' style='border-color:{risk_col}'><div clas
 
 st.markdown("---")
 
-# TABS
-tab1, tab2 = st.tabs(["📊 Business Intelligence", "🔍 Participant Vault"])
+tab1, tab2 = st.tabs(["📊 Caseload Overview", "🔍 Participant Vault"])
 
-# --- TAB 1: BUSINESS INTELLIGENCE (BI) ---
 with tab1:
-    # Row 1: Risk & Revenue
-    r1_c1, r1_c2 = st.columns(2)
-    
-    with r1_c1:
-        st.markdown("#### 🚨 Risk Radar")
+    c_viz, c_data = st.columns([1, 2])
+    with c_viz:
+        st.markdown("### Viability Radar")
         if not df.empty:
             color_map = {"ROBUST SURPLUS": "#3fb950", "SUSTAINABLE": "#2ea043", "MONITORING REQUIRED": "#d29922", "CRITICAL SHORTFALL": "#f85149"}
-            fig_pie = px.pie(df, names='status', color='status', color_discrete_map=color_map, hole=0.6)
-            fig_pie.update_layout(showlegend=True, margin=dict(t=20,b=20,l=20,r=20), height=300, paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
-            st.plotly_chart(fig_pie, use_container_width=True)
-            
-    with r1_c2:
-        st.markdown("#### 💰 Revenue Forecast")
-        if not df.empty:
-            # Calculate revenue per level
-            rev_data = df.groupby('level')['weekly_cost'].sum().reset_index()
-            rev_data['Monthly Revenue'] = rev_data['weekly_cost'] * 4.33
-            
-            fig_bar = px.bar(rev_data, x='level', y='Monthly Revenue', color='level', 
-                             color_discrete_sequence=["#58a6ff", "#a371f7"], text_auto='.2s')
-            fig_bar.update_layout(showlegend=False, margin=dict(t=20,b=20,l=20,r=20), height=300, paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
-            fig_bar.update_xaxes(showticklabels=False, title=None)
-            fig_bar.update_yaxes(showgrid=True, gridcolor='#30363d')
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-    # Row 2: Timeline & Health
-    r2_c1, r2_c2 = st.columns(2)
-    
-    with r2_c1:
-        st.markdown("#### 📅 Plan Expiry Timeline")
-        if not df.empty:
-            fig_scat = px.scatter(df, x='plan_end', y='surplus', color='status', 
-                                  size='weekly_cost', hover_name='name', 
-                                  color_discrete_map=color_map)
-            fig_scat.update_layout(height=300, margin=dict(t=20,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)', font_color="#c9d1d9")
-            fig_scat.update_yaxes(gridcolor='#30363d', title="Surplus/Deficit ($)")
-            fig_scat.update_xaxes(gridcolor='#30363d', title="Plan End Date")
-            st.plotly_chart(fig_scat, use_container_width=True)
-
-    with r2_c2:
-        st.markdown("#### 📉 Caseload Actions")
-        st.info("Generate a comprehensive Word document for your entire caseload for compliance and auditing.")
+            fig = px.pie(df, names='status', color='status', color_discrete_map=color_map, hole=0.6)
+            fig.update_layout(showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig, use_container_width=True)
+        
         report_doc = generate_caseload_report(all_metrics)
-        st.download_button("📄 Download Master Report (.docx)", report_doc, f"Caseload_Report_{datetime.date.today()}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True, type="primary")
+        st.download_button("📄 Download Full Report (.docx)", report_doc, f"Caseload_Report_{datetime.date.today()}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True, type="primary")
 
-    # Row 3: Full Data Table
-    st.markdown("#### 📋 Full Participant Register")
-    display_df = df[['name', 'plan_end', 'status', 'runway_weeks', 'surplus']]
-    display_df.columns = ['Name', 'End Date', 'Health', 'Runway', 'Outcome']
-    st.dataframe(
-        display_df.style.format({'Outcome': "${:,.0f}", 'Runway': "{:.1f}"})
-        .applymap(lambda x: 'color:#f85149; font-weight:bold' if x=='CRITICAL SHORTFALL' else 'color:#3fb950' if x=='ROBUST SURPLUS' else '', subset=['Health']),
-        use_container_width=True, height=400
-    )
+    with c_data:
+        st.markdown("### Participant List")
+        display_df = df[['name', 'plan_end', 'status', 'runway_weeks', 'surplus']]
+        display_df.columns = ['Name', 'End Date', 'Health', 'Runway', 'Outcome']
+        st.dataframe(
+            display_df.style.format({'Outcome': "${:,.0f}", 'Runway': "{:.1f}"})
+            .applymap(lambda x: 'color:#f85149; font-weight:bold' if x=='CRITICAL SHORTFALL' else 'color:#3fb950' if x=='ROBUST SURPLUS' else '', subset=['Health']),
+            use_container_width=True, height=400
+        )
 
-# --- TAB 2: CLIENT VAULT ---
 with tab2:
     c_sel, c_act = st.columns([3, 1])
     with c_sel:
@@ -274,7 +357,6 @@ with tab2:
         rem = client_metrics['weeks_remaining']
         ideal_wk = client_metrics['balance'] / rem if rem > 0 else 0
         y_opt = [max(0, client_metrics['balance'] - (w * ideal_wk)) for w in range(len(dates))]
-        
         chart_df = pd.DataFrame({"Date": dates*2, "Balance": y_act + y_opt, "Type": ["Actual Trajectory"]*len(dates) + ["Ideal Path"]*len(dates)})
         fig = px.line(chart_df, x="Date", y="Balance", color="Type", color_discrete_map={"Actual Trajectory": client_metrics['color'], "Ideal Path": "#6e7681"})
         fig.update_traces(patch={"line": {"dash": "dot"}}, selector={"legendgroup": "Ideal Path"})
