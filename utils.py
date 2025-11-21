@@ -45,15 +45,12 @@ def process_csv_upload(uploaded_file):
 
 # --- MATH ENGINE ---
 def calculate_client_metrics(c):
-    """Calculates runway, surplus, and status."""
     try:
         balance = float(c.get('balance', 0))
-        # FIX: Check both 'hours' and 'hours_per_week' to prevent $0 bugs
-        hours = float(c.get('hours') or c.get('hours_per_week', 0))
+        hours = float(c.get('hours', 0))
         rate = float(c.get('rate', 100.14))
         budget = float(c.get('budget', 0))
         
-        # Handle Date Parsing
         plan_end_str = c.get('plan_end')
         if isinstance(plan_end_str, (datetime.date, datetime.datetime)):
             plan_end = plan_end_str
@@ -66,21 +63,19 @@ def calculate_client_metrics(c):
     except Exception:
         return None
 
-    # Time Calculations
     today = datetime.date.today()
     weeks_remaining = max(0, (plan_end - today).days / 7)
-    
-    # Financial Calculations
     weekly_cost = hours * rate
+    
     if weekly_cost > 0:
         runway_weeks = balance / weekly_cost
     else:
-        runway_weeks = 999 # Infinite runway if no spend
+        runway_weeks = 999
         
     surplus = balance - (weekly_cost * weeks_remaining)
     depletion_date = today + timedelta(days=int(runway_weeks * 7))
     
-    # NDIS Status Logic
+    # Status Logic
     if runway_weeks >= weeks_remaining * 1.2:
         status = "ROBUST SURPLUS"
         color = "#3fb950" # Green
@@ -119,50 +114,23 @@ def generate_caseload_report(caseload_data):
     doc = Document()
     doc.add_heading('XYSTON | Caseload Master Report', 0)
     doc.add_paragraph(f"Date: {datetime.date.today().strftime('%d %B %Y')}")
-    doc.add_paragraph("Confidential: Internal Use Only")
-    doc.add_page_break()
     
-    # Executive Summary
-    doc.add_heading('Executive Summary', 1)
     total_funds = sum(c['balance'] for c in caseload_data)
-    monthly_rev = sum(c['weekly_cost'] for c in caseload_data) * 4.33
-    critical_clients = [c for c in caseload_data if "CRITICAL" in c['status']]
     
-    p = doc.add_paragraph()
-    p.add_run(f"Total Participants: {len(caseload_data)}\n").bold = True
-    p.add_run(f"Funds Under Management: ${total_funds:,.2f}\n")
-    p.add_run(f"Projected Monthly Revenue: ${monthly_rev:,.2f}\n")
+    doc.add_heading('Executive Summary', 1)
+    doc.add_paragraph(f"Total Clients: {len(caseload_data)}")
+    doc.add_paragraph(f"Funds Under Management: ${total_funds:,.2f}")
     
-    if critical_clients:
-        doc.add_heading('⚠️ Critical Risk Watchlist', 3)
-        for c in critical_clients:
-            doc.add_paragraph(f"• {c['name']}: Runs out on {c['depletion_date'].strftime('%d/%m/%y')} (${abs(c['surplus']):,.0f} shortfall)")
-            
-    doc.add_page_break()
-    
-    # Individual Files
     for c in caseload_data:
-        doc.add_heading(f"{c['name']} ({c['ndis_number']})", 1)
-        
-        p = doc.add_paragraph()
-        run = p.add_run(f"PLAN HEALTH: {c['status']}")
-        run.bold = True
-        run.font.color.rgb = RGBColor(0xf8, 0x51, 0x49) if "CRITICAL" in c['status'] else RGBColor(0x3f, 0xb9, 0x50)
-        
-        p = doc.add_paragraph()
-        p.add_run(f"Current Balance: ${c['balance']:,.2f}\n")
-        p.add_run(f"Weekly Burn: ${c['weekly_cost']:,.2f} ({c['hours']} hrs/wk)\n")
-        p.add_run(f"Plan Ends: {c['plan_end'].strftime('%d/%m/%Y')} ({c['weeks_remaining']:.1f} wks left)\n")
-        
-        outcome = f"${c['surplus']:,.2f}"
-        p.add_run(f"Projected Outcome: {'+' if c['surplus'] > 0 else ''}{outcome}\n")
-        
+        doc.add_page_break()
+        doc.add_heading(f"{c['name']}", 1)
+        doc.add_paragraph(f"Status: {c['status']}")
+        doc.add_paragraph(f"Balance: ${c['balance']:,.2f}")
+        doc.add_paragraph(f"Outcome: ${c['surplus']:,.2f}")
         if c['notes']:
-            doc.add_heading('Strategy Notes', 2)
+            doc.add_heading('Strategy', 2)
             doc.add_paragraph(c['notes'])
             
-        doc.add_page_break()
-        
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
