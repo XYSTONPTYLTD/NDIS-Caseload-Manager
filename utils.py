@@ -27,7 +27,6 @@ def process_csv_upload(uploaded_file):
         new_clients = []
         for _, row in df.iterrows():
             level = row.get("Support Level", "Level 2: Coordination of Supports")
-            # Default to L2 rate if level text doesn't match exactly
             rate = RATES.get(level, 100.14)
             
             client = {
@@ -44,7 +43,7 @@ def process_csv_upload(uploaded_file):
             }
             new_clients.append(client)
         return new_clients
-    except Exception as e:
+    except Exception:
         return None
 
 # --- MATH ENGINE ---
@@ -56,31 +55,27 @@ def calculate_client_metrics(c):
         rate = float(c.get('rate', 100.14))
         budget = float(c.get('budget', 0))
         
-        # Handle Date Parsing safely
+        # Handle Date Parsing
         plan_end_str = c.get('plan_end')
         if isinstance(plan_end_str, (datetime.date, datetime.datetime)):
             plan_end = plan_end_str
         else:
-            # Try parsing string date
             try:
                 plan_end = datetime.datetime.strptime(str(plan_end_str), "%Y-%m-%d").date()
             except:
-                # Fallback if date is invalid
                 plan_end = datetime.date.today() + timedelta(weeks=40)
             
     except Exception:
         return None
 
-    # Time Calculations
     today = datetime.date.today()
     weeks_remaining = max(0, (plan_end - today).days / 7)
-    
-    # Financial Calculations
     weekly_cost = hours * rate
+    
     if weekly_cost > 0:
         runway_weeks = balance / weekly_cost
     else:
-        runway_weeks = 999 # Infinite runway if no spend
+        runway_weeks = 999 
         
     surplus = balance - (weekly_cost * weeks_remaining)
     depletion_date = today + timedelta(days=int(runway_weeks * 7))
@@ -121,10 +116,8 @@ def calculate_client_metrics(c):
 
 # --- WORD REPORT GENERATOR ---
 def generate_caseload_report(caseload_data):
-    """Generates a professional Word doc for the whole caseload."""
+    """Generates a professional Word doc."""
     doc = Document()
-    
-    # Title
     doc.add_heading('XYSTON | Caseload Master Report', 0)
     doc.add_paragraph(f"Date: {datetime.date.today().strftime('%d %B %Y')}")
     doc.add_paragraph("Confidential: Internal Use Only")
