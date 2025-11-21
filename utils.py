@@ -14,14 +14,11 @@ RATES = {
 
 # --- CSV HANDLERS ---
 def generate_csv_template():
-    """Creates a blank CSV template for bulk imports."""
     df = pd.DataFrame(columns=["Name", "NDIS Number", "Support Level", "Total Budget", "Current Balance", "Plan End Date (YYYY-MM-DD)", "Hours Per Week"])
-    # Add one example row
     df.loc[0] = ["John Doe", "430123456", "Level 2: Coordination of Supports", 18000, 15000, (datetime.date.today() + timedelta(weeks=40)).strftime("%Y-%m-%d"), 1.5]
     return df.to_csv(index=False).encode('utf-8')
 
 def process_csv_upload(uploaded_file):
-    """Converts uploaded CSV into the app's client dictionary format."""
     try:
         df = pd.read_csv(uploaded_file)
         new_clients = []
@@ -51,7 +48,8 @@ def calculate_client_metrics(c):
     """Calculates runway, surplus, and status."""
     try:
         balance = float(c.get('balance', 0))
-        hours = float(c.get('hours', 0))
+        # FIX: Check both 'hours' and 'hours_per_week' to prevent $0 bugs
+        hours = float(c.get('hours') or c.get('hours_per_week', 0))
         rate = float(c.get('rate', 100.14))
         budget = float(c.get('budget', 0))
         
@@ -68,14 +66,16 @@ def calculate_client_metrics(c):
     except Exception:
         return None
 
+    # Time Calculations
     today = datetime.date.today()
     weeks_remaining = max(0, (plan_end - today).days / 7)
-    weekly_cost = hours * rate
     
+    # Financial Calculations
+    weekly_cost = hours * rate
     if weekly_cost > 0:
         runway_weeks = balance / weekly_cost
     else:
-        runway_weeks = 999 
+        runway_weeks = 999 # Infinite runway if no spend
         
     surplus = balance - (weekly_cost * weeks_remaining)
     depletion_date = today + timedelta(days=int(runway_weeks * 7))
@@ -116,7 +116,6 @@ def calculate_client_metrics(c):
 
 # --- WORD REPORT GENERATOR ---
 def generate_caseload_report(caseload_data):
-    """Generates a professional Word doc."""
     doc = Document()
     doc.add_heading('XYSTON | Caseload Master Report', 0)
     doc.add_paragraph(f"Date: {datetime.date.today().strftime('%d %B %Y')}")
